@@ -10,5 +10,5 @@ import UIKit
 
 class MemoryCell: UICollectionViewCell
 {
-    
+    @IBOutlet var imageView: UIImageView!
 }

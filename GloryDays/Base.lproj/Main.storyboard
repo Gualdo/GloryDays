@@ -26,14 +26,14 @@
                                 <rect key="frame" x="38" y="215" width="300" height="238"/>
                                 <subviews>
                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" textAlignment="justified" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hJt-Mz-OVy">
-                                        <rect key="frame" x="0.5" y="0.0" width="300" height="186"/>
+                                        <rect key="frame" x="0.0" y="0.0" width="300" height="186"/>
                                         <string key="text">Para poder utilizar la app, Glory Days necesitamos permisos para leer tu biblioteca de fotos, grabar tu voz y transcribirla a texto. Haciendo click en el boton Continuar, nos estaras dando estos permisos, pero si cambias de opinion puedes cambiar la configuracion en el menu de ajustes</string>
                                         <fontDescription key="fontDescription" name="AvenirNext-Regular" family="Avenir Next" pointSize="17"/>
                                         <nil key="textColor"/>
                                         <nil key="highlightedColor"/>
                                     </label>
                                     <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Bvf-Pl-Mld">
-                                        <rect key="frame" x="107" y="201" width="87" height="37"/>
+                                        <rect key="frame" x="106.5" y="201" width="87" height="37"/>
                                         <fontDescription key="fontDescription" name="AvenirNext-Bold" family="Avenir Next" pointSize="18"/>
                                         <state key="normal" title="Continuar">
                                             <color key="titleColor" white="0.0" alpha="1" colorSpace="calibratedWhite"/>
@@ -68,7 +68,7 @@
         <scene sceneID="ha9-Pt-WDc">
             <objects>
                 <collectionViewController id="hJ8-OO-A2I" customClass="MemoriesCollectionViewController" customModule="GloryDays" customModuleProvider="target" sceneMemberID="viewController">
-                    <collectionView key="view" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" misplaced="YES" dataMode="prototypes" id="RQV-GT-x6h">
+                    <collectionView key="view" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" id="RQV-GT-x6h">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" red="0.6337926767209473" green="0.59971780162842325" blue="0.66786755181347135" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
@@ -97,6 +97,9 @@
                                     <constraint firstAttribute="bottom" secondItem="3Si-hZ-LL9" secondAttribute="bottom" id="kFN-6k-pAD"/>
                                     <constraint firstItem="3Si-hZ-LL9" firstAttribute="leading" secondItem="Cg4-mg-dAp" secondAttribute="leading" id="rMW-JX-i5d"/>
                                 </constraints>
+                                <connections>
+                                    <outlet property="imageView" destination="3Si-hZ-LL9" id="uUD-AW-e8b"/>
+                                </connections>
                             </collectionViewCell>
                         </cells>
                         <collectionReusableView key="sectionHeaderView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" reuseIdentifier="header" id="edp-jC-6Sa">
