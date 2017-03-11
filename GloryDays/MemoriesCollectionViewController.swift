@@ -13,11 +13,21 @@ import Speech
 
 private let reuseIdentifier = "Cell"
 
-class MemoriesCollectionViewController: UICollectionViewController
+class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate
 {
+    //MARK: - Global Variables
+    
+    var memories : [URL] = []
+    
+    //MARK: - Overrides
+    
     override func viewDidLoad()
     {
         super.viewDidLoad()
+        
+        self.loadMemories()
+        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(self.addImagePressed)) // Crear un boton por codigo en el navigation bar para agregar items llamando al metodo addImagePressed que creamos mas abajo
 
         // Uncomment the following line to preserve selection between presentations
         // self.clearsSelectionOnViewWillAppear = false
@@ -41,6 +51,8 @@ class MemoriesCollectionViewController: UICollectionViewController
         // Dispose of any resources that can be recreated.
     }
     
+    //MARK: - Defined Methods
+    
     func checkForGrantedPermissions()
     {
         let photosAuth : Bool = PHPhotoLibrary.authorizationStatus() == .authorized
@@ -56,6 +68,67 @@ class MemoriesCollectionViewController: UICollectionViewController
                 navigationController?.present(vc , animated: true, completion: nil)
             }
         }
+    }
+    
+    func loadMemories()
+    {
+        self.memories.removeAll() // Se vacia el array para asegurar que no duplicamos nada
+        
+        guard let files = try? FileManager.default.contentsOfDirectory(at: getDocumentoDirectory(), includingPropertiesForKeys: nil, options: []) // Devuelve el conjunto de archivos que se encuentren en la funcion de abajo (getDocumentsDirectory) sin opciones por eso el [], se utiliza el guard ya que es lo mismo que el do try catch puesto que el la funcion getDocumentosDirectory puede que no devuelva nada o de error y puede petar es mejor usar el guard ya que si se pasa con exito podemos seguir usando abajo la variable files que contiene los archivos que se encontrar a diferencia del try cath que usa un for u no se puede usar mas la variable fuera del for
+            else
+            {
+                return // Se devuelve vacio para terminar la ejecucion en caso de un error
+            }
+        
+        for file in files
+        {
+            let fileName = file.lastPathComponent // Da el nombre del archivo
+            
+            if fileName.hasSuffix(".thumb") // Hace la revision de que el archivo sea un .thumb que son las miniaturas
+            {
+                let noExtension = fileName.replacingOccurrences(of: ".thumb", with: "") // Elimina la extencion del nombre del archivo y solo se queda con el nombre
+                
+                let memoryPath = getDocumentoDirectory().appendingPathComponent(noExtension)
+                
+                memories.append(memoryPath) // Estoy agregando en el arreglo de memories un nombre sin extencion para luego colocandole la extencion deseada puedo usar la foto, el thumb, el texto o la grabacion
+            }
+        }
+        
+        collectionView?.reloadSections(IndexSet(integer : 1)) // Recarga la seccion numero 1 y no el 0 ya que la barra de busqueda de la app esta en la 0 las imagenees empiezan en el 1
+    }
+    
+    func getDocumentoDirectory() -> URL
+    {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask) // documentDirectory donde se guardan en gener los dumentos de las app y userDomainMask es donde se guardan los archivos del usuario
+        let documentsDirectory = paths[0] // Nos quedamos con el primer path para guardar y cargar las fotos
+        
+        return documentsDirectory
+    }
+    
+    func addImagePressed()
+    {
+        let vc = UIImagePickerController() // Se crea una llamada al ViewController de picker
+        
+        vc.modalPresentationStyle = .formSheet // Se seleccion el estilo de presentacion de este view controller con el estilo formSheet
+        
+        vc.delegate = self // Se le dice al sistema que nosotros mismos somos el delegado ya que nuestra clase se encarga de gestionar la seleccion o cancelacion de imagenes
+        
+        navigationController?.present(vc, animated: true, completion: nil) // Se presenta el viewcontroller y se usa el navigationController ya que estamos en un navigation controller
+    }
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any])
+    {
+        if let theImage = info[UIImagePickerControllerOriginalImage] as? UIImage
+        {
+            addNewMemory(image: theImage) // Se llama al metodo para agregar una nueva imagen
+            
+            self.loadMemories() // refresca la colection view con los datos nuevos
+        }
+    }
+    
+    func addNewMemory(image : UIImage)
+    {
+        
     }
 
     /*
