@@ -7,6 +7,9 @@
 //
 
 import UIKit
+import AVFoundation
+import Photos
+import Speech
 
 private let reuseIdentifier = "Cell"
 
@@ -24,11 +27,35 @@ class MemoriesCollectionViewController: UICollectionViewController
 
         // Do any additional setup after loading the view.
     }
+    
+    override func viewDidAppear(_ animated: Bool) // Las transiciones entre view controller no se deben hacer en ViewDidLoad sino aqui
+    {
+        super.viewDidAppear(animated)
+        
+        self.checkForGrantedPermissions()
+    }
 
     override func didReceiveMemoryWarning()
     {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
+    }
+    
+    func checkForGrantedPermissions()
+    {
+        let photosAuth : Bool = PHPhotoLibrary.authorizationStatus() == .authorized
+        let recordingAuth : Bool = AVAudioSession.sharedInstance().recordPermission() == .granted
+        let transcriptionAuth : Bool = SFSpeechRecognizer.authorizationStatus() == .authorized
+        
+        let authorized = photosAuth && recordingAuth && transcriptionAuth // Si tengo autorizacion para los 3 el valor sera true
+        
+        if !authorized
+        {
+            if let vc = storyboard?.instantiateViewController(withIdentifier: "ShowTerms")
+            {
+                navigationController?.present(vc , animated: true, completion: nil)
+            }
+        }
     }
 
     /*

@@ -4,6 +4,12 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceder a tus fotos para mostrarlas en la App</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Necesitamos acceso al microfono para grabar tus comentarios de cada foto</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Necesitamos acceso para transcribir tus comentarios a texto</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
