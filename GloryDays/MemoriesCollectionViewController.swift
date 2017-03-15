@@ -11,7 +11,7 @@ import AVFoundation
 import Photos
 import Speech
 
-private let reuseIdentifier = "Cell"
+private let reuseIdentifier = "cell"
 
 class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate
 {
@@ -70,7 +70,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         }
     }
     
-    func loadMemories()
+    func loadMemories() // Carga las memorias desde disco en donde esten guardadas
     {
         self.memories.removeAll() // Se vacia el array para asegurar que no duplicamos nada
         
@@ -116,7 +116,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         navigationController?.present(vc, animated: true, completion: nil) // Se presenta el viewcontroller y se usa el navigationController ya que estamos en un navigation controller
     }
     
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any])
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) // Importa nuevas fotos
     {
         if let theImage = info[UIImagePickerControllerOriginalImage] as? UIImage
         {
@@ -126,9 +126,73 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         }
     }
     
-    func addNewMemory(image : UIImage)
+    func addNewMemory(image : UIImage) // Guarda imagenes en disco en forma de imagenes y de miniaturas para mejorar el scroll
     {
+        let memoryName = "memory-\(Date().timeIntervalSince1970)" // 1970 Traduce el tiempo desde esa epoca hasta el momento en segundos para que no exista ningun nombre igual
         
+        let imageName = "\(memoryName).jpg"
+        let thumbName = "\(memoryName).thumb"
+        
+        do
+        {
+            let imagePath = getDocumentoDirectory().appendingPathComponent(imageName) // En la carpeta principal donde estan los recursos de nuestra app crear una carpeta para la imagen en jpg
+            
+            if let jpegData = UIImageJPEGRepresentation(image, 80) // Crea una imagen en mapa de bits comprimiendo en este caso al 80%
+            {
+                try jpegData.write(to: imagePath, options: [.atomicWrite]) // Atomic hace que se escriba todo junto no en varias partes del disco
+            }
+            
+            if let thumbnail = resizeImage(image: image, to: 200) // Se llama al codigo de miniaturizacion para luego hacer el proceso de guardado igual que arriba
+            {
+                let thumbPath = getDocumentoDirectory().appendingPathComponent(thumbName)
+                
+                if let jpegData = UIImageJPEGRepresentation(thumbnail, 80)
+                {
+                    try jpegData.write(to: thumbPath, options: [.atomicWrite])
+                }
+            }
+        }
+        catch
+        {
+            print("Ha fallado la escritura en disco")
+        }
+    }
+    
+    func resizeImage(image : UIImage , to width : CGFloat) -> UIImage? // Metodo para escalar la imagen para el thumb
+    {
+        let scaleFactor = width/image.size.width // Se consigue el factor de escalado teniendo en cuenta que ya se sabe el alcho que se quiere
+        
+        let height = image.size.height * scaleFactor // Se busca la altura de la imagen resultante usando el mismo factor de escalado para mantener la estetica
+        
+        UIGraphicsBeginImageContextWithOptions(CGSize(width : width , height : height) , false, 0) // Redimenciona la imagen
+        
+        image.draw(in: CGRect(x: 0, y: 0, width: width, height: height)) // Redibuja la imagen dentro de este rectangulo que creamos
+        
+        let newImage = UIGraphicsGetImageFromCurrentImageContext() // Del contexto en el que estamos trabajando obtiene la nueva imagen y la crea
+        
+        UIGraphicsEndImageContext() // Finaliza la edicion de la imagen
+        
+        return newImage
+    }
+    
+    func imageURL(for memory : URL) -> URL // Consige la url de la imagen de la memoria
+    {
+        return memory.appendingPathExtension("jpg")
+    }
+    
+    func thumbnailURL(for memory : URL) -> URL // Consige la url del thumbnail de la memoria
+    {
+        return memory.appendingPathExtension("thumb")
+    }
+    
+    func audioURL(for memory : URL) -> URL // Consige la url del audio de la memoria
+    {
+        return memory.appendingPathExtension("m4a")
+    }
+    
+    func transcriptionURL(for memory : URL) -> URL // Consige la url de la transcripcion del audio de la memoria
+    {
+        return memory.appendingPathExtension("txt")
     }
 
     /*
@@ -146,23 +210,56 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     override func numberOfSections(in collectionView: UICollectionView) -> Int
     {
         // #warning Incomplete implementation, return the number of sections
-        return 0
+        return 2 // Genera las dos secciones que tiene la app
     }
 
 
     override func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int
     {
         // #warning Incomplete implementation, return the number of items
-        return 0
+        
+        if section == 0
+        {
+            return 0 // Ya que en la seccion inicial no hay elementos no hay que mostrar una celda solo esta la barra de busqueda
+        }
+        else
+        {
+            return self.memories.count // Muestra la cantidad de elementos que contenga el Array memories
+        }
     }
 
     override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell
     {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath)
-    
-        // Configure the cell
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! MemoryCell // Hace que las celdas que ya pasamos sean reutilizadas
+        
+        let memory = self.memories[indexPath.row] // Recuperamos el recuedno en particular por la fila seleccionada usando el row
+        
+        let memoryName = self.thumbnailURL(for: memory).path // Obtiene el nombre de la memoria
+        
+        let image = UIImage(contentsOfFile: memoryName)
+        
+        cell.imageView.image = image
     
         return cell
+    }
+    
+    override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView // Configura la barra de busqueda que tenemos arriba
+    {
+        let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "header", for: indexPath)
+        
+        return header
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize
+    {
+        if section == 0
+        {
+            return CGSize(width: 0, height: 50)
+        }
+        else
+        {
+            return CGSize.zero
+        }
     }
 
     // MARK: UICollectionViewDelegate
