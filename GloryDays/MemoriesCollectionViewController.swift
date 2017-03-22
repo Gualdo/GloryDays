@@ -13,17 +13,22 @@ import Speech
 
 private let reuseIdentifier = "cell"
 
-class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate
+class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, AVAudioRecorderDelegate
 {
     //MARK: - Global Variables
     
     var memories : [URL] = []
+    var currentMemory : URL!
+    var audioRecorder : AVAudioRecorder?
+    var recordingURL : URL!
     
     //MARK: - Overrides
     
     override func viewDidLoad()
     {
         super.viewDidLoad()
+        
+        self.recordingURL = getDocumentoDirectory().appendingPathComponent("memory-recording.m4a")
         
         self.loadMemories()
         
@@ -33,7 +38,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         // self.clearsSelectionOnViewWillAppear = false
 
         // Register cell classes
-        self.collectionView!.register(UICollectionViewCell.self, forCellWithReuseIdentifier: reuseIdentifier)
+        //self.collectionView!.register(UICollectionViewCell.self, forCellWithReuseIdentifier: reuseIdentifier)
 
         // Do any additional setup after loading the view.
     }
@@ -123,6 +128,8 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
             addNewMemory(image: theImage) // Se llama al metodo para agregar una nueva imagen
             
             self.loadMemories() // refresca la colection view con los datos nuevos
+            
+            dismiss(animated: true, completion: nil)
         }
     }
     
@@ -239,8 +246,85 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         let image = UIImage(contentsOfFile: memoryName)
         
         cell.imageView.image = image
+        
+        if cell.gestureRecognizers == nil // Se le da la opcion de presionado largo a la celda
+        {
+            let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(self.memoryLogPressed(sender:)))
+            recognizer.minimumPressDuration = 0.3
+            cell.addGestureRecognizer(recognizer)
+            
+            cell.layer.borderColor = UIColor.white.cgColor //Con estas 3 lineas de codigo se le da formato a la estica de la celda
+            cell.layer.borderWidth = 4
+            cell.layer.cornerRadius = 10
+        }
     
         return cell
+    }
+    
+    func memoryLogPressed(sender : UILongPressGestureRecognizer) // Detecta pulsaciones prolongadas
+    {
+        if sender.state == .began
+        {
+            let cell = sender.view as! MemoryCell // Trae cual es la celda (memoria) que fue presionada de forma prolongada
+            
+            if let index = collectionView?.indexPath(for: cell) // Se obtiene el index de la celda en cuestion
+            {
+                self.currentMemory = self.memories[index.row]
+                
+                self.startRecordingMemory() // Se empieza el proceso de grabado para esta celda
+            }
+        }
+        
+        if sender.state == .ended
+        {
+            self.finishRecordingMemory(success: true) // Se finaliza el proceso de grabado de esta celda
+        }
+    }
+    
+    func startRecordingMemory()
+    {
+        collectionView?.backgroundColor = UIColor(red: 0.6, green: 0.0, blue: 0.0, alpha: 1.0) // Se pone el fondo de color rojo para darle feedback al usuario de que se esta grabando
+        
+        let recordingSession = AVAudioSession.sharedInstance() // Se crea una instancia compartida de grabacion de audio
+        
+        do
+        {
+            try recordingSession.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .defaultToSpeaker) // Se usa el PLay and Record ya que se quiere no solo guardar sino tambien escuchar lo que el usuario grabo con la misma sesion
+            try recordingSession.setActive(true)
+            
+            let recordingSettings = [ AVFormatIDKey : Int(kAudioFormatMPEG4AAC), // Tipo de archivo de sonido que se va a grabar
+                                      AVSampleRateKey : 44100, // Calidad del sonido que se va a guardar
+                                      AVNumberOfChannelsKey : 2, // Canales de grabacion
+                                      AVEncoderAudioQualityKey : AVAudioQuality.high.rawValue // Calidad del codificador todas las configuraciones tiene que estar en INT por eso el .rawValue
+                                    ]
+            
+            audioRecorder = try AVAudioRecorder(url: recordingURL, settings: recordingSettings)
+            audioRecorder?.delegate = self
+            audioRecorder?.record()
+        }
+        catch let error
+        {
+            print(error)
+            finishRecordingMemory(success: false)
+        }
+    }
+    
+    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) // Revisa si se logro la grabacion de forma correcta
+    {
+        if !flag
+        {
+            finishRecordingMemory(success: false)
+        }
+    }
+    
+    func finishRecordingMemory(success : Bool)
+    {
+        print("Finishing recording")
+    }
+    
+    func transcribeAudioToText(memory : URL)
+    {
+        
     }
     
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView // Configura la barra de busqueda que tenemos arriba
