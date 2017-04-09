@@ -21,6 +21,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     var currentMemory : URL!
     var audioRecorder : AVAudioRecorder?
     var recordingURL : URL!
+    var audioPlayer : AVAudioPlayer?
     
     //MARK: - Overrides
     
@@ -283,13 +284,15 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     
     func startRecordingMemory()
     {
+        audioPlayer?.stop() // En caso de que al momento de grabar se esta reproduciendo un sonido este lo detiene
+        
         collectionView?.backgroundColor = UIColor(red: 0.6, green: 0.0, blue: 0.0, alpha: 1.0) // Se pone el fondo de color rojo para darle feedback al usuario de que se esta grabando
         
         let recordingSession = AVAudioSession.sharedInstance() // Se crea una instancia compartida de grabacion de audio
         
         do
         {
-            try recordingSession.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .defaultToSpeaker) // Se usa el PLay and Record ya que se quiere no solo guardar sino tambien escuchar lo que el usuario grabo con la misma sesion
+            try recordingSession.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .defaultToSpeaker) // Se usa el Play and Record ya que se quiere no solo guardar sino tambien escuchar lo que el usuario grabo con la misma sesion
             try recordingSession.setActive(true)
             
             let recordingSettings = [ AVFormatIDKey : Int(kAudioFormatMPEG4AAC), // Tipo de archivo de sonido que se va a grabar
@@ -299,8 +302,8 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
                                     ]
             
             audioRecorder = try AVAudioRecorder(url: recordingURL, settings: recordingSettings)
-            audioRecorder?.delegate = self
-            audioRecorder?.record()
+            audioRecorder?.delegate = self //Marca la clase como delegado que se encarga de empezar y terminar la grabacion
+            audioRecorder?.record() //Comienza a grabar
         }
         catch let error
         {
@@ -319,12 +322,61 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     
     func finishRecordingMemory(success : Bool)
     {
-        print("Finishing recording")
+        collectionView?.backgroundColor = UIColor(red: 97.0/255.0, green: 86.0/255.0, blue: 110.0/255.0, alpha: 1.0)
+        audioRecorder?.stop()
+        
+        if success
+        {
+            do
+            {
+                let memoryAudioURL = self.currentMemory.appendingPathExtension("m4a")
+                let fileManager = FileManager.default
+                
+                if fileManager.fileExists(atPath: memoryAudioURL.path)
+                {
+                    try fileManager.removeItem(at: memoryAudioURL)
+                }
+                
+                try fileManager.moveItem(at: recordingURL, to: memoryAudioURL)
+                self.transcribeAudioToText(memory: self.currentMemory) //Transcribe el audio en la memoria que esta seleccionada
+            }
+            catch let error
+            {
+                print("Ha habido un error \(error)")
+            }
+        }
     }
     
     func transcribeAudioToText(memory : URL)
     {
+        let audio = audioURL(for: memory)
+        let transcription = transcriptionURL(for: memory)
         
+        let recognizer = SFSpeechRecognizer()
+        let request = SFSpeechURLRecognitionRequest(url: audio)
+        
+        recognizer?.recognitionTask(with: request, resultHandler:
+            { [unowned self] (result, error) in
+            guard let result = result else
+                                      {
+                                        print("Ha habido el siguiente error: \(String(describing: error))")
+                                        return
+                                      }
+                
+                if result.isFinal
+                {
+                    let text = result.bestTranscription.formattedString //Guarda la mejor traduccion posible aunque el array tra varias que se pueden usar
+                    
+                    do
+                    {
+                        try text.write(to: transcription, atomically: true, encoding: String.Encoding.utf8)
+                    }
+                    catch
+                    {
+                        print("Ha habido un error al guardar la transcripcion")
+                    }
+                }
+            })
     }
     
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView // Configura la barra de busqueda que tenemos arriba
@@ -343,6 +395,34 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         else
         {
             return CGSize.zero
+        }
+    }
+    
+    override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) //Maneja las pulsaciones cortas de una memory
+    {
+        let memory = self.memories[indexPath.row]
+        let fileManager = FileManager.default
+        
+        do
+        {
+            let audioName = audioURL(for: memory)
+            let transcriptionName = transcriptionURL(for: memory)
+            
+            if fileManager.fileExists(atPath: audioName.path)
+            {
+                self.audioPlayer = try AVAudioPlayer(contentsOf: audioName)
+                self.audioPlayer?.play()
+            }
+            
+            if fileManager.fileExists(atPath: transcriptionName.path)
+            {
+                let contents = try String(contentsOf: transcriptionName)
+                print(contents)
+            }
+        }
+        catch
+        {
+            print("Error al cargar el medio a reproducir")
         }
     }
 
