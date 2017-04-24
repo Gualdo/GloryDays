@@ -10,18 +10,22 @@ import UIKit
 import AVFoundation
 import Photos
 import Speech
+import CoreSpotlight // Permite almacenar el SpotLight los textos creados para indexarlos
+import MobileCoreServices // Algo como una base de datos
 
 private let reuseIdentifier = "cell"
 
-class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, AVAudioRecorderDelegate
+class MemoriesCollectionViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, AVAudioRecorderDelegate, UISearchBarDelegate
 {
     //MARK: - Global Variables
     
     var memories : [URL] = []
+    var filteredMemories : [URL] = []
     var currentMemory : URL!
     var audioRecorder : AVAudioRecorder?
     var recordingURL : URL!
     var audioPlayer : AVAudioPlayer?
+    var searchQuery : CSSearchQuery
     
     //MARK: - Overrides
     
@@ -99,6 +103,8 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
                 memories.append(memoryPath) // Estoy agregando en el arreglo de memories un nombre sin extencion para luego colocandole la extencion deseada puedo usar la foto, el thumb, el texto o la grabacion
             }
         }
+        
+        filteredMemories = memories
         
         collectionView?.reloadSections(IndexSet(integer : 1)) // Recarga la seccion numero 1 y no el 0 ya que la barra de busqueda de la app esta en la 0 las imagenees empiezan en el 1
     }
@@ -232,7 +238,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         }
         else
         {
-            return self.memories.count // Muestra la cantidad de elementos que contenga el Array memories
+            return self.filteredMemories.count // Muestra la cantidad de elementos que contenga el Array memories
         }
     }
 
@@ -240,7 +246,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! MemoryCell // Hace que las celdas que ya pasamos sean reutilizadas
         
-        let memory = self.memories[indexPath.row] // Recuperamos el recuedno en particular por la fila seleccionada usando el row
+        let memory = self.filteredMemories[indexPath.row] // Recuperamos el recuedno en particular por la fila seleccionada usando el row
         
         let memoryName = self.thumbnailURL(for: memory).path // Obtiene el nombre de la memoria
         
@@ -270,7 +276,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
             
             if let index = collectionView?.indexPath(for: cell) // Se obtiene el index de la celda en cuestion
             {
-                self.currentMemory = self.memories[index.row]
+                self.currentMemory = self.filteredMemories[index.row]
                 
                 self.startRecordingMemory() // Se empieza el proceso de grabado para esta celda
             }
@@ -370,6 +376,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
                     do
                     {
                         try text.write(to: transcription, atomically: true, encoding: String.Encoding.utf8)
+                        self.indexMemory(memory : memory , text : text)
                     }
                     catch
                     {
@@ -377,6 +384,29 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
                     }
                 }
             })
+    }
+    
+    func indexMemory(memory : URL , text : String)
+    {
+        let atributeSet = CSSearchableItemAttributeSet(itemContentType: kUTTypeText as String) // Prepara la zona de almacenamiento en forma de String
+        atributeSet.title = "Recuerdo de Glory Days"
+        atributeSet.contentDescription = text
+        atributeSet.thumbnailURL = thumbnailURL(for: memory)
+        
+        let item = CSSearchableItem(uniqueIdentifier: memory.path, domainIdentifier: "com.eduardodelacruz", attributeSet: atributeSet)
+        item.expirationDate = Date.distantFuture
+        
+        CSSearchableIndex.default().indexSearchableItems([item])
+            { (error) in
+                if let error = error
+                {
+                    print("Ha habido un problema al indexar \(error)")
+                }
+                else
+                {
+                    print("Hemos podido indexar correctamente el texto: \(text)")
+                }
+            }
     }
     
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView // Configura la barra de busqueda que tenemos arriba
@@ -400,7 +430,7 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
     
     override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) //Maneja las pulsaciones cortas de una memory
     {
-        let memory = self.memories[indexPath.row]
+        let memory = self.filteredMemories[indexPath.row]
         let fileManager = FileManager.default
         
         do
@@ -424,6 +454,68 @@ class MemoriesCollectionViewController: UICollectionViewController, UIImagePicke
         {
             print("Error al cargar el medio a reproducir")
         }
+    }
+    
+    func filterMemories(text : String)
+    {
+        guard text.characters.count > 0 // Valida que el texto de busqueda no sea vacio, si no lo es ejecuta todo lo que esta a partir de allTheItems si no es asi ejecuta el else
+            else {
+                    self.filteredMemories = self.memories
+                    UIView.performWithoutAnimation // Refresca la vista
+                        {
+                            collectionView?.reloadSections(IndexSet(integer: 1))
+                        }
+                
+                    return
+                 }
+        
+        var allTheItems : [CSSearchableItem] = []
+        
+        self.searchQuery.cancel()
+        
+        let queryString = "contentDescriptio == \"*\(text)*\"c" // Sitaxis que quiere decir que se busque todos los objetos del tipo CoreSpotlight Searchable Item (CSSearchableItem) cuyo contentDescription contenga o sea igual al texto introducido por el usuario precedido de cualquier texto (primer asterisco) y postcedido por cualquier palabra (segundo asterisco) y la c quiere decir que no importa si se escribe en mayusculas o minusculas
+        
+        self.searchQuery = CSSearchQuery(queryString: queryString, attributes: nil) // Se crea la query a usar con el string que creamos arriba y mas ningun atributo
+        
+        self.searchQuery.foundItemsHandler = // foundItemsHandler nos permite configurar que se va a hacer cuando se consiga algo con los parametros enviados
+            {
+                items in allTheItems.append(contentsOf: items)
+            }
+        
+        self.searchQuery.completionHandler = // Se ejecuta cuando se completa la busqueda, el recorrido
+            {
+                error in DispatchQueue.main.async
+                    {
+                        [unowned self] in self.activateFilter(matches : allTheItems)
+                    }
+            }
+        
+        self.searchQuery.start() // Inicia la consulta
+    }
+    
+    func activateFilter(matches : [CSSearchableItem]) // Traduce el conjunto de CSSearchableItem al conjuto de memorias que nos hace falta
+    {
+        self.filteredMemories = matches.map
+            {   item in
+                let uniqueID = item.uniqueIdentifier
+                let url = URL(fileURLWithPath: uniqueID)
+                return url
+            }
+        
+        UIView.performWithoutAnimation // Refresca la vista
+            {
+                collectionView?.reloadSections(IndexSet(integer: 1))
+            }
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) // Metodo que se ejecuta cuando el texto de la barra de busqueda cambia y realiza la busqueda con lo que esta escrito
+    {
+        self.filterMemories(text: searchText) // Ejecuta el metodo de filtrado de memorias enviando el texto escrito hasta el momento
+    }
+    
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) // Ejecuta una busqueda luego de presionar el boton de buscar
+    {
+        searchBar.resignFirstResponder() // Oculta el teclado que se abrio para la busqueda
     }
 
     // MARK: UICollectionViewDelegate
